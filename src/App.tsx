@@ -5,7 +5,16 @@
 
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { Loader2, Sparkles, Play, Image as ImageIcon, Video, RefreshCw, CheckSquare, Square, Download, Mic, Check, Youtube, HelpCircle, PlusCircle, X } from 'lucide-react';
-import { generateScript, oneTouchPlan, generateAudio, generateImage, generateVideo, Cut, Ratio, Style, Voice, CharacterEthnicity, CharacterAge, CharacterGender, setCustomApiKey } from './lib/api';
+import { generateScript, oneTouchPlan, generateAudio, generateImage, generateVideo, generateMusic, Cut, Ratio, Style, Voice, CharacterEthnicity, CharacterAge, CharacterGender, setCustomApiKey } from './lib/api';
+
+declare global {
+  interface Window {
+    aistudio: {
+      hasSelectedApiKey: () => Promise<boolean>;
+      openSelectKey: () => Promise<void>;
+    };
+  }
+}
 
 function ApiKeyModal({ isOpen, onClose, onKeySelected, currentKey }: { isOpen: boolean, onClose: () => void, onKeySelected: (key: string) => void, currentKey: string }) {
   const [manualKey, setManualKey] = useState(currentKey);
@@ -27,35 +36,64 @@ function ApiKeyModal({ isOpen, onClose, onKeySelected, currentKey }: { isOpen: b
     }
   };
 
+  const handleOpenSelectKey = async () => {
+    if (window.aistudio?.openSelectKey) {
+      await window.aistudio.openSelectKey();
+      // On small delay to let the platform environment catch up
+      setTimeout(() => {
+        onKeySelected('PLATFORM_KEY');
+        onClose();
+      }, 500);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-zinc-900 p-8 rounded-2xl max-w-md w-full text-center border border-white/10 relative">
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+      <div className="bg-zinc-900 p-8 rounded-2xl max-w-md w-full text-center border border-white/10 relative shadow-2xl">
         <button onClick={onClose} className="absolute top-4 right-4 text-zinc-400 hover:text-white">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          <X className="w-6 h-6" />
         </button>
         <h2 className="text-2xl font-bold text-white mb-4">API 키 설정</h2>
         <p className="text-zinc-400 mb-6 text-sm">
-          고품질 이미지 및 영상 생성을 위해 Google Gemini API 키를 입력해주세요.
+          고품질 이미지 및 영상 생성을 위해 Google Gemini API 키가 필요합니다.
         </p>
 
-        <form onSubmit={handleManualSubmit} className="space-y-3">
-          <input
-            type="password"
-            value={manualKey}
-            onChange={(e) => setManualKey(e.target.value)}
-            placeholder="AIzaSy..."
-            className="w-full bg-zinc-950 border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
-          />
-          <button
-            type="submit"
-            disabled={!manualKey.trim()}
-            className="w-full bg-red-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-red-500 transition disabled:opacity-50"
-          >
-            API 키 저장
-          </button>
-        </form>
-        <p className="mt-4 text-xs text-zinc-500">
-          입력하신 키는 브라우저 로컬 스토리지에만 안전하게 저장됩니다.
+        <div className="space-y-4">
+          {window.aistudio && (
+            <button
+              onClick={handleOpenSelectKey}
+              className="w-full bg-indigo-600 text-white px-6 py-4 rounded-xl font-bold hover:bg-indigo-500 transition shadow-[0_0_20px_rgba(79,70,229,0.3)] flex items-center justify-center gap-2"
+            >
+              <Sparkles className="w-5 h-5" />
+              유료 API 키 선택하기 (권장)
+            </button>
+          )}
+
+          <div className="relative py-2">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
+            <div className="relative flex justify-center text-xs uppercase"><span className="bg-zinc-900 px-2 text-zinc-500">또는 직접 입력</span></div>
+          </div>
+
+          <form onSubmit={handleManualSubmit} className="space-y-3">
+            <input
+              type="password"
+              value={manualKey}
+              onChange={(e) => setManualKey(e.target.value)}
+              placeholder="AIzaSy..."
+              className="w-full bg-zinc-950 border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+            />
+            <button
+              type="submit"
+              disabled={!manualKey.trim()}
+              className="w-full bg-zinc-800 text-white px-6 py-3 rounded-xl font-semibold hover:bg-zinc-700 transition disabled:opacity-50"
+            >
+              직접 입력한 키 저장
+            </button>
+          </form>
+        </div>
+        
+        <p className="mt-6 text-[10px] text-zinc-500 leading-relaxed">
+          Veo 비디오 생성 등은 <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">결제 설정</a>이 된 Google Cloud 프로젝트의 API 키가 필요합니다.
         </p>
       </div>
     </div>
@@ -215,6 +253,16 @@ interface PatchNote {
 
 const PATCH_NOTES: PatchNote[] = [
   {
+    date: '2026-05-01',
+    title: 'API 모델 및 안정성 패치',
+    type: 'fix',
+    content: [
+      '일부 환경에서 발생하던 API 404 오류(모델 찾을 수 없음)를 해결했습니다.',
+      '스크립트 및 음성 생성 모델을 안정적인 버전(Gemini 1.5 Flash)으로 전환했습니다.',
+      '전체 자동화 도중 멈춤 현상에 대한 예외 처리를 강화했습니다.'
+    ]
+  },
+  {
     date: '2026-04-29',
     title: '패치노트 시스템 도입 및 UI 고도화',
     type: 'feature',
@@ -361,11 +409,22 @@ export default function App() {
     setTimeout(() => setToast(null), 5000);
   };
 
-  const handleManualProceed = async () => {
-    if (!hasKey) {
+  const checkAndPromptForApiKey = async () => {
+    if (window.aistudio?.hasSelectedApiKey) {
+      const hasKey = await window.aistudio.hasSelectedApiKey();
+      if (!hasKey) {
+        setIsApiKeyModalOpen(true);
+        return false;
+      }
+    } else if (!hasKey) {
       setIsApiKeyModalOpen(true);
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const handleManualProceed = async () => {
+    if (!await checkAndPromptForApiKey()) return;
     if (!topic) {
       showToast('주제를 입력해주세요.', 'error');
       return;
@@ -452,8 +511,23 @@ export default function App() {
   const handleError = (e: any, defaultMessage: string) => {
     console.error(e);
     const errorMessage = e?.message || String(e);
+    
+    if (errorMessage.includes('AUDIO_QUOTA_EXCEEDED')) {
+      showToast('음성 생성 할당량을 초과했습니다. 잠시 후 다시 시도하거나 다른 API 키를 사용해주세요.', 'error');
+      return;
+    }
+    
+    if (errorMessage.includes('VIDEO_PERMISSION_DENIED')) {
+      setIsApiKeyModalOpen(true);
+      showToast('영상 생성을 위해 유료 API 키(결제 설정됨) 선택이 필요합니다.', 'error');
+      return;
+    }
+
     if (errorMessage.includes('429') || errorMessage.includes('quota')) {
       showToast('API 할당량을 초과했습니다. Google Cloud 결제 설정을 확인하거나 잠시 후 다시 시도해주세요.', 'error');
+    } else if (errorMessage.includes('403') || errorMessage.includes('permission') || errorMessage.includes('PERMISSION_DENIED')) {
+      setIsApiKeyModalOpen(true);
+      showToast('API 권한이 없습니다. 유료 API 키를 선택하거나 Billing 설정을 확인해주세요.', 'error');
     } else if (errorMessage.includes('503') || errorMessage.includes('high demand') || errorMessage.includes('UNAVAILABLE')) {
       showToast('현재 AI 모델 사용량이 많아 일시적으로 지연되고 있습니다. 잠시 후 다시 시도해주세요.', 'error');
     } else {
@@ -578,7 +652,7 @@ export default function App() {
       if (!backgroundMusicUrl) {
         setAutoStatusText('주제에 어울리는 배경음악 생성 중...');
         try {
-          const url = await (await import('./lib/api')).generateMusic(`${topic} - style: ${musicStyle}`);
+          const url = await generateMusic(`${topic} - style: ${musicStyle}`);
           setBackgroundMusicUrl(url);
           await sleep(500);
         } catch (e) {
@@ -643,8 +717,15 @@ export default function App() {
               });
               await sleep(1000);
             }
-          } catch (e) {
+          } catch (e: any) {
             console.error(`Video generation failed for cut ${i}:`, e);
+            const errorMessage = e?.message || String(e);
+            if (errorMessage.includes('not found') || errorMessage.includes('permission')) {
+              setIsAutoGenerating(false);
+              setIsApiKeyModalOpen(true);
+              showToast('영상 생성을 위해 유료 API 키 선택이 필요합니다.', 'info');
+              return;
+            }
           }
         }
         safeUpdateProgress();
@@ -715,6 +796,9 @@ export default function App() {
       showToast('먼저 이미지를 생성해주세요.', 'error');
       return;
     }
+
+    if (!await checkAndPromptForApiKey()) return;
+
     updateCut(index, { isGeneratingVideo: true });
     try {
       const url = await generateVideo(cut.imageUrl, cut.videoPrompt, ratio, referenceImages);
@@ -728,7 +812,7 @@ export default function App() {
   const handleGenerateMusic = async () => {
     setIsGeneratingMusic(true);
     try {
-      const url = await (await import('./lib/api')).generateMusic(`${topic} - style: ${musicStyle}`);
+      const url = await generateMusic(`${topic} - style: ${musicStyle}`);
       setBackgroundMusicUrl(url);
       showToast('배경음악이 생성되었습니다.', 'success');
     } catch (e: any) {
